@@ -13,20 +13,22 @@
 
 环境：Windows 10/11、Python 3.11+、Node.js 20.19+ 或 22.12+、npm、Git。首次安装需要联网。
 
-1. 双击 `安装依赖.bat`，或运行 `powershell -File scripts/setup.ps1`。
-2. 双击 `启动平台.bat`，打开 http://127.0.0.1:8000 。关闭终端即停止服务。
+1. 双击 `安装依赖.bat`，等待窗口显示 `Setup complete` 后按任意键关闭。也可以运行 `powershell -File scripts/setup.ps1`。
+2. 双击 `启动平台.bat`。页面可访问后会自动打开默认浏览器，已有平台在运行时会直接打开现有页面。若浏览器未打开，可手动访问 http://127.0.0.1:8000/ 。启动服务的窗口应保持打开。
 3. 选择案例，确认健康参考区间，点击“运行统计分析”。
+
+安装或启动失败时，批处理窗口会保留错误提示。若提示 8000 被其他服务占用，可以运行 `powershell -ExecutionPolicy Bypass -File scripts/start.ps1 -Port 8001`，访问 http://127.0.0.1:8001/ 。
 
 手动安装：
 
 ```powershell
-python -m venv .venv
+python -m venv --without-pip .venv
 python -m pip --python .venv install -r requirements.lock.txt
 cd frontend
 npm ci
 npm run build
 cd ..
-.\.venv\Scripts\python.exe -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
+.\.venv\Scripts\python.exe -m scripts.launch
 ```
 
 前端开发：在 `frontend` 运行 `npm run dev`；后端仍用 8000 端口。生产构建的前端由 FastAPI 同源提供，无外部图表 CDN。
