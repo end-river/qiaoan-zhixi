@@ -102,6 +102,9 @@ async def stream_chat(request, analysis, conversation, question):
                     break
                 messages.append({'role':'assistant','content':text or None,'tool_calls':list(calls.values())})
                 for c in list(calls.values())[:8]:
+                    if await request.is_disconnected():
+                        status='cancelled'
+                        return
                     name=c['function']['name']
                     yield event('tool',{'name':name,'status':'running'})
                     try:
