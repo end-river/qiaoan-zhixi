@@ -1,11 +1,11 @@
 import hashlib
 import io
-import os
 import re
 import httpx
 import numpy as np
 from pypdf import PdfReader
 from . import storage
+from .ai_config import read_ai_config
 
 SEEDS = [
     {
@@ -96,10 +96,8 @@ def extract(content, filename):
 
 
 async def embed(texts):
-    model = os.getenv("EMBEDDING_MODEL", "text-embedding-v2")
-    base = os.getenv(
-        "AI_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"
-    ).rstrip("/")
+    config = read_ai_config()
+    model, base = config.embedding_model, config.base_url
     result = []
     missing = []
     for i, text in enumerate(texts):
@@ -114,7 +112,7 @@ async def embed(texts):
             batch = missing[offset : offset + 10]
             response = await client.post(
                 base + "/embeddings",
-                headers={"Authorization": "Bearer " + os.environ["AI_API_KEY"]},
+                headers={"Authorization": "Bearer " + config.key},
                 json={"model": model, "input": [x[1] for x in batch]},
             )
             response.raise_for_status()
@@ -159,7 +157,7 @@ async def search(query, use_vectors=True):
     scores = lexical.copy()
     mode = "keyword"
     warning = None
-    if use_vectors and os.getenv("AI_API_KEY"):
+    if use_vectors and read_ai_config().key:
         try:
             vectors = await embed([query] + [c["text"] for c in chunks])
             vectors /= np.maximum(np.linalg.norm(vectors, axis=1, keepdims=True), 1e-10)

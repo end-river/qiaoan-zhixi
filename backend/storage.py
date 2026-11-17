@@ -26,17 +26,24 @@ def connect():
 
 def save(kind, body, identifier=None):
     identifier = identifier or uuid.uuid4().hex
+    save_batch([(kind, body, identifier)])
+    return {"id": identifier, **body}
+
+
+def save_batch(objects):
     with connect() as db:
-        db.execute(
+        db.executemany(
             "INSERT OR REPLACE INTO objects VALUES (?,?,?,?)",
             (
-                identifier,
-                kind,
-                json.dumps(body, ensure_ascii=False, allow_nan=False),
-                datetime.now(timezone.utc).isoformat(),
+                (
+                    identifier,
+                    kind,
+                    json.dumps(body, ensure_ascii=False, allow_nan=False),
+                    datetime.now(timezone.utc).isoformat(),
+                )
+                for kind, body, identifier in objects
             ),
         )
-    return {"id": identifier, **body}
 
 
 def get(kind, identifier):

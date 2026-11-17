@@ -1,6 +1,7 @@
 """Start the local workbench and open it only after the web page is ready."""
 
 import argparse
+import json
 import socket
 import threading
 import time
@@ -19,8 +20,24 @@ def platform_ready(port):
         with closing(HTTPConnection(HOST, port, timeout=1)) as connection:
             connection.request("GET", "/")
             response = connection.getresponse()
-            return response.status == 200 and TITLE in response.read(16_384)
-    except (OSError, HTTPException):
+            if response.status != 200 or TITLE not in response.read(16_384):
+                return False
+        with closing(HTTPConnection(HOST, port, timeout=1)) as connection:
+            connection.request("GET", "/api/v2/health")
+            response = connection.getresponse()
+            if response.status != 200:
+                return False
+            data = json.loads(response.read(4096))
+            return (
+                isinstance(data, dict)
+                and data.get("service") == "bridge-insight"
+                and data.get("api_version") == 2
+                and data.get("workspace_drafts") is True
+                and data.get("record_deletion") is True
+                and data.get("observation_intervals") is True
+                and data.get("chat_observation_intervals") is True
+            )
+    except (OSError, HTTPException, ValueError):
         return False
 
 
@@ -54,7 +71,9 @@ def open_platform(url, no_browser):
             return
     except (OSError, webbrowser.Error):
         pass
-    print(f"Browser did not open. Paste this address into your browser: {url}", flush=True)
+    print(
+        f"Browser did not open. Paste this address into your browser: {url}", flush=True
+    )
 
 
 def launch(port, no_browser):
@@ -65,8 +84,11 @@ def launch(port, no_browser):
         return 0
 
     if port_in_use(port):
-        print(f"Port {port} is in use by another service.")
-        print("Close that service or run scripts\\start.ps1 -Port 8001.")
+        print(
+            f"Port {port} is occupied and does not serve the current Bridge Insight API."
+        )
+        print("Close the previous platform window, then relaunch.")
+        print("If the port belongs to another app, run scripts\\start.ps1 -Port 8001.")
         return 1
 
     if not (ROOT / "frontend" / "dist" / "index.html").is_file():
@@ -85,10 +107,16 @@ def launch(port, no_browser):
         if wait_for_platform(port, 45, stopped):
             open_platform(url, no_browser)
         elif not stopped.is_set():
-            print(f"The page has not responded yet. Check the messages above and try {url}", flush=True)
+            print(
+                f"The page has not responded yet. Check the messages above and try {url}",
+                flush=True,
+            )
 
     print(f"Starting Bridge Insight at {url}", flush=True)
-    print("Keep this window open while using the platform. Press Ctrl+C to stop it.", flush=True)
+    print(
+        "Keep this window open while using the platform. Press Ctrl+C to stop it.",
+        flush=True,
+    )
     server = uvicorn.Server(uvicorn.Config("backend.main:app", host=HOST, port=port))
     watcher = threading.Thread(target=announce_ready, daemon=True)
     watcher.start()

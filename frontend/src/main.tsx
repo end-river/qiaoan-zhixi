@@ -1,7 +1,9 @@
-import React, { Component, type ErrorInfo, type ReactNode } from "react";
+import React, { Component, Suspense, lazy, type ErrorInfo, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./style.css";
+const MonitorWorkbench = lazy(() => import("./MonitorWorkbench"));
+const legacy = new URLSearchParams(window.location.search).get("legacy") === "1";
 class Boundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   state = { failed: false };
   static getDerivedStateFromError() {
@@ -25,7 +27,9 @@ class Boundary extends Component<{ children: ReactNode }, { failed: boolean }> {
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <Boundary>
-      <App />
+      <Suspense fallback={<p role="status" style={{ padding: 30 }}>正在打开分析工作台…</p>}>
+        {legacy ? <App /> : <MonitorWorkbench />}
+      </Suspense>
     </Boundary>
   </React.StrictMode>,
 );

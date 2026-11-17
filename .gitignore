@@ -3,6 +3,8 @@ node_modules/
 frontend/dist/
 runtime/
 .env
+.env.*
+!.env.example
 __pycache__/
 *.pyc
 .pytest_cache/

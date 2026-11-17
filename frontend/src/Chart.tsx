@@ -28,17 +28,27 @@ export function Chart({
   option,
   height = 300,
   group,
+  label = "交互式监测数据图表",
+  onReady,
+  onClick,
 }: {
   option: Record<string, unknown>;
   height?: number;
   group?: string;
+  label?: string;
+  onReady?: (chart: echarts.ECharts) => void;
+  onClick?: (index: number) => void;
 }) {
   const element = useRef<HTMLDivElement>(null);
   const chart = useRef<echarts.ECharts | null>(null);
+  const callbacks = useRef({ onReady, onClick });
+  callbacks.current = { onReady, onClick };
   useEffect(() => {
     if (!element.current) return;
     const instance = echarts.init(element.current);
     chart.current = instance;
+    callbacks.current.onReady?.(instance);
+    instance.on("click", (event) => callbacks.current.onClick?.(event.dataIndex));
     if (group) {
       instance.group = group;
       echarts.connect(group);
@@ -57,7 +67,7 @@ export function Chart({
   return (
     <div
       role="img"
-      aria-label="交互式监测数据图表"
+      aria-label={label}
       ref={element}
       style={{ height, width: "100%" }}
     />

@@ -1,15 +1,14 @@
 import io
-import os
 from contextlib import asynccontextmanager
 from pathlib import Path
-from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
-from . import storage, analysis, knowledge, reports, agent
+from . import storage, analysis, knowledge, reports, agent, monitor_api, monitor_data
+from .ai_config import read_ai_config
+from .monitor_analysis import ObservationIntervalError
 
-load_dotenv(storage.ROOT / ".env")
 ACTIVE = set()
 
 
@@ -30,6 +29,7 @@ async def lifespan(app):
                 identifier,
             )
     knowledge.seed()
+    monitor_data.seed()
     yield
 
 
@@ -39,6 +39,13 @@ app = FastAPI(title="桥安智析 API", version="1.0.0", lifespan=lifespan)
 @app.exception_handler(ValueError)
 async def invalid(request, exc):
     return JSONResponse({"detail": str(exc)}, status_code=422)
+
+
+@app.exception_handler(ObservationIntervalError)
+async def observation_interval_required(request, exc):
+    return JSONResponse(
+        {"detail": str(exc), "code": "observation_interval_required"}, status_code=422
+    )
 
 
 @app.exception_handler(KeyError)
@@ -59,10 +66,11 @@ async def local_guard(request, call_next):
 
 @app.get("/api/status")
 def status():
+    config = read_ai_config()
     return {
-        "ai_configured": bool(os.getenv("AI_API_KEY")),
-        "model": os.getenv("AI_MODEL", "qwen-plus"),
-        "embedding_model": os.getenv("EMBEDDING_MODEL", "text-embedding-v2"),
+        "ai_configured": bool(config.key),
+        "model": config.model,
+        "embedding_model": config.embedding_model,
         "version": "1.0.0",
     }
 
@@ -178,10 +186,10 @@ def conversations(analysis_id: str):
 
 @app.post("/api/chat")
 async def chat(body: ChatInput, request: Request):
-    if not os.getenv("AI_API_KEY"):
+    if not read_ai_config().key:
         raise HTTPException(
             503,
-            "未配置 AI_API_KEY。统计分析可正常使用；请在本机 .env 配置密钥并重启服务，才能使用真实 AI。",
+            "未配置 AI_API_KEY。请在本机 .env 中填写密钥并刷新页面。统计分析可正常使用。",
         )
     a = storage.get("analysis", body.analysis_id)
     c = (
@@ -261,6 +269,8 @@ def pdf(identifier):
         headers={"Content-Disposition": 'attachment; filename="bridge-report.pdf"'},
     )
 
+
+app.include_router(monitor_api.router)
 
 DIST = storage.ROOT / "frontend" / "dist"
 if DIST.exists():

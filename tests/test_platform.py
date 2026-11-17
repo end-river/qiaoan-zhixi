@@ -6,13 +6,14 @@ import numpy as np
 import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
-from backend import analysis, storage, knowledge, agent
+from backend import ai_config, analysis, storage, knowledge, agent
 from backend.main import app
 
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     monkeypatch.setattr(storage, "DATA", tmp_path)
+    monkeypatch.setattr(ai_config, "ENV_FILE", tmp_path / ".env")
     monkeypatch.delenv("AI_API_KEY", raising=False)
     with TestClient(app) as client:
         yield client

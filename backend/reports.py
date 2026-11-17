@@ -36,7 +36,7 @@ def create_report(analysis_id, conclusion="", citations=None):
     )
 
 
-def render_pdf(title, sections):
+def chinese_font():
     font_path = Path(os.getenv("CJK_FONT_PATH", "C:/Windows/Fonts/simsun.ttc"))
     font_name = "BridgeChinese"
     if font_path.exists():
@@ -44,6 +44,11 @@ def render_pdf(title, sections):
     else:
         font_name = "STSong-Light"
         pdfmetrics.registerFont(UnicodeCIDFont(font_name))
+    return font_name
+
+
+def render_pdf(title, sections, *, subtitle="BRIDGE INSIGHT / 桥梁监测分析工作台"):
+    font_name = chinese_font()
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer,
@@ -79,14 +84,16 @@ def render_pdf(title, sections):
     )
     story = [
         Paragraph(escape(title), big),
-        Paragraph("BRIDGE INSIGHT / 桥梁监测分析工作台", body),
+        Paragraph(escape(subtitle), body),
         Spacer(1, 12),
     ]
-    for section, content in sections:
+    for section, content, *figures in sections:
         story.append(Paragraph(escape(section), heading))
         for line in content.split("\n"):
             if line.strip():
                 story.append(Paragraph(escape(line), body))
+        if figures:
+            story.extend(figures[0])
 
     def footer(canvas, document):
         canvas.setStrokeColor(colors.HexColor("#dce5eb"))
